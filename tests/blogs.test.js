@@ -5,6 +5,7 @@ const supertest = require('supertest')
 const listHelper = require('../utils/list_helper')
 const bloglist = require('../models/bloglist')
 const app = require('../app')
+const User = require('../models/user')
 const api = supertest(app)
 
 test('dummy returns one', () => {
@@ -214,15 +215,36 @@ describe('Author with Most Likes', () => {
 })
 
 describe('Exercise 4.8 - 4.12', () => {
+  let token
+
   beforeEach(async () => {
     await bloglist.deleteMany({})
+    await User.deleteMany({})
+
+    const newUser = {
+      username: 'aditya',
+      name: 'Aditya Dalvi',
+      password: 'secret123'
+    }
+    await api.post('/api/users').send(newUser)
+
+    const loginResponse = await api
+      .post('/api/login')
+      .send({ username: 'aditya', password: 'secret123' })
+
+    token = `Bearer ${loginResponse.body.token}`
 
     const blogs = [
       { title: 'First Blog', author: 'Author 1', url: 'url1.com', likes: 5 },
       { title: 'Second Blog', author: 'Author 2', url: 'url2.com', likes: 10 }
     ]
 
-    await bloglist.insertMany(blogs)
+    for (const blog of blogs) {
+      await api
+        .post('/api/blogs')
+        .set('Authorization', token)
+        .send(blog)
+    }
   })
 
   test('unique identifier property of the blog posts is named id', async () => {
@@ -250,6 +272,7 @@ describe('Exercise 4.8 - 4.12', () => {
 
     await api
       .post('/api/blogs/')
+      .set('Authorization', token)
       .send(newBlog)
       .expect(201)
       .expect('Content-Type', /application\/json/)
@@ -257,6 +280,20 @@ describe('Exercise 4.8 - 4.12', () => {
     const final_length = await api.get('/api/blogs/')
 
     assert.strictEqual(final_length.body.length, initial_length.body.length + 1)
+  })
+
+  test('fails to create a new blog without token (401 Unauthorized)', async () => {
+    const newBlog = {
+      title: 'How Maa Tara Guided Me Part 101',
+      author: 'Aditya Dalvi',
+      url: 'dummy-url.com',
+      likes: 9142353647110000,
+    }
+
+    await api
+      .post('/api/blogs/')
+      .send(newBlog)
+      .expect(401)
   })
 
   test('likes property will default to the value 0 if not provided', async () => {
@@ -269,6 +306,7 @@ describe('Exercise 4.8 - 4.12', () => {
 
     const result = await api
       .post('/api/blogs/')
+      .set('Authorization', token)
       .send(newBlog)
       .expect(201)
       .expect('Content-Type', /application\/json/)
@@ -286,6 +324,7 @@ describe('Exercise 4.8 - 4.12', () => {
 
     await api
       .post('/api/blogs/')
+      .set('Authorization', token)
       .send(newBlog)
       .expect(400)
 
@@ -300,6 +339,7 @@ describe('Exercise 4.8 - 4.12', () => {
 
     await api
       .post('/api/blogs/')
+      .set('Authorization', token)
       .send(newBlog)
       .expect(400)
   })
@@ -323,6 +363,7 @@ describe('Exercise 4.8 - 4.12', () => {
 
     await api
       .delete(`/api/blogs/${blogToDelete.id}`)
+      .set('Authorization', token)
       .expect(204)
   })
 
@@ -334,6 +375,7 @@ describe('Exercise 4.8 - 4.12', () => {
 
     const response = await api
       .put(`/api/blogs/${blogToUpdate.id}`)
+      .set('Authorization', token)
       .send(newLikes)
       .expect(200)
       .expect('Content-Type', /application\/json/)
