@@ -30,8 +30,13 @@ BlogRouter.post('/', tokenExtractor, userExtractor, async (request, response) =>
     })
   }
   const blog = new Blog(request.body)
+
   blog.user = first_user._id
+  first_user.blogs.push(blog._id)
+  // console.log('===>',blog, first_user)
+
   const result = await blog.save()
+  await first_user.save()
   response.status(201).json(result)
 })
 
